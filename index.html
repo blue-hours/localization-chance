@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+<title>지역브랜드 찬스카드</title>
+<style>
+:root { --ink: #111; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0; height: 100%; overflow: hidden;
+  font-family: 'Noto Sans CJK KR', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+  background: #f2f2f2;
+  user-select: none;
+}
+#app { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1.2vh 3vw 0.9vh 3vw;
+  border-bottom: 6px solid var(--ink);
+  background: white; flex: 0 0 auto; gap: 2vw;
+}
+.chance-wordmark {
+  font-size: 6.6vh; font-weight: 900; letter-spacing: -1px; line-height: 1; white-space: nowrap;
+}
+.chance-wordmark span:nth-child(1) { color: #1ba9f0; }
+.chance-wordmark span:nth-child(2) { color: #ffc107; }
+.chance-wordmark span:nth-child(3) { color: #ff2d78; }
+.chance-wordmark span:nth-child(4) { color: #7c1cf2; }
+.chance-wordmark span:nth-child(5) { color: #ff7a1a; }
+.chance-wordmark span:nth-child(6) { color: #5bd142; }
+.instructions {
+  font-size: 3.1vh; font-weight: 700; color: var(--ink);
+  text-align: right; line-height: 1.5; max-width: 68%;
+}
+.instructions b { color: #d81b60; }
+.counter {
+  font-size: 2.6vh; font-weight: 800; color: white; background: var(--ink);
+  border-radius: 999px; padding: 0.7vh 2.2vw; white-space: nowrap;
+}
+
+.stage {
+  position: relative; flex: 1 1 auto; display: flex; align-items: center;
+  justify-content: center; overflow: hidden; padding: 1.2vh 2vw;
+}
+
+.card-pool { display: none; }
+.card { position: absolute; inset: 0; display: none; }
+.card.active { display: block; }
+
+/* ===== Deck ===== */
+.deck-wrap {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3vh;
+}
+.deck {
+  position: relative; width: min(42vh, 78vw); aspect-ratio: 3 / 4;
+  cursor: pointer; user-select: none;
+}
+.deck-card {
+  position: absolute; inset: 0; border-radius: 24px;
+  box-shadow: 0 10px 22px rgba(0,0,0,0.35);
+}
+.rainbow-bg {
+  background: linear-gradient(135deg, #ff3cac 0%, #ff9a44 20%, #f7e733 40%, #3ee06b 58%, #22c1e0 75%, #7b5bff 90%, #ff3cac 100%);
+}
+.deck-back { border: 3px solid rgba(255,255,255,0.7); }
+.deck-back6 { transform: translate(19px, 23px) rotate(7deg); opacity: 0.32; }
+.deck-back5 { transform: translate(15px, 18px) rotate(5.5deg); opacity: 0.42; }
+.deck-back4 { transform: translate(11px, 14px) rotate(4.2deg); opacity: 0.55; }
+.deck-back3 { transform: translate(7.5px, 9.5px) rotate(3deg); opacity: 0.68; }
+.deck-back2 { transform: translate(4px, 5px) rotate(1.8deg); opacity: 0.82; }
+.deck-back1 { transform: translate(1.5px, 2px) rotate(0.6deg); opacity: 0.95; }
+.deck-top {
+  border: 3px solid white;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1.6vh; color: white; text-align: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.deck:hover .deck-top { transform: translateY(-6px); box-shadow: 0 16px 28px rgba(0,0,0,0.4); }
+.deck:active .deck-top { transform: translateY(-2px) scale(0.98); }
+.deck-logo { font-size: 6vh; font-weight: 900; letter-spacing: -1px; text-shadow: 0 3px 6px rgba(0,0,0,0.3); }
+.deck-sub {
+  font-size: 2.4vh; font-weight: 800; line-height: 1.4; color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  background: linear-gradient(135deg, #ffb0d8 0%, #ff5fa8 55%, #ff2f8f 100%);
+  border-radius: 999px; padding: 1.6vh 3.6vw; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.deck.drawing { pointer-events: none; }
+.deck.empty .deck-top { opacity: 0.4; cursor: default; }
+.deck-remaining {
+  font-size: 2.6vh; font-weight: 800; color: white; background: var(--ink);
+  border-radius: 999px; padding: 1vh 3vw;
+}
+.reset-btn {
+  font-size: 2.4vh; font-weight: 800; color: white; background: #d81b60;
+  border: none; border-radius: 999px; padding: 1.2vh 3.2vw; cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+}
+.reset-btn:hover { background: #c2185b; }
+
+/* ===== Popup overlay & flip ===== */
+.popup-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.72);
+  display: none; align-items: center; justify-content: center;
+  z-index: 200; padding: 2.5vh 2.5vw;
+}
+.popup-overlay.show { display: flex; }
+.popup-flip {
+  width: min(1000px, 92vw); height: 90vh; perspective: 2400px;
+  transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
+              height 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: width, height;
+}
+.popup-flip.mini {
+  width: min(42vh, 78vw);
+  height: min(56vh, 104vw);
+  transition: none;
+}
+.flip-inner {
+  position: relative; width: 100%; height: 100%;
+  transform-style: preserve-3d;
+  transform: rotateY(0deg);
+}
+.flip-inner.spin {
+  animation: cardSpin360 0.375s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+}
+.flip-inner.spinX {
+  animation: cardSpin360X 0.375s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+}
+.flip-inner.flipped {
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform: rotateY(180deg);
+}
+.flip-inner.spin, .flip-inner.spinX {
+  position: relative;
+}
+.flip-inner.spin::after, .flip-inner.spinX::after {
+  content: ''; position: absolute; inset: -6%; pointer-events: none;
+  border-radius: 36px; z-index: 5;
+  background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.35) 35%, rgba(255,255,255,0) 70%);
+  mix-blend-mode: screen;
+  animation: sparkleFlash 0.375s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+}
+@keyframes cardSpin360 {
+  0%   { transform: rotateY(0deg);   filter: brightness(1) drop-shadow(0 0 0 rgba(255,255,255,0)); }
+  25%  { filter: brightness(1.9) drop-shadow(0 0 22px rgba(255,255,255,1)); }
+  50%  { transform: rotateY(180deg); filter: brightness(1) drop-shadow(0 0 0 rgba(255,255,255,0)); }
+  75%  { filter: brightness(1.9) drop-shadow(0 0 22px rgba(255,255,255,1)); }
+  100% { transform: rotateY(360deg); filter: brightness(1) drop-shadow(0 0 0 rgba(255,255,255,0)); }
+}
+@keyframes cardSpin360X {
+  0%   { transform: rotateX(0deg);   filter: brightness(1) drop-shadow(0 0 0 rgba(255,255,255,0)); }
+  25%  { filter: brightness(1.9) drop-shadow(0 0 22px rgba(255,255,255,1)); }
+  50%  { transform: rotateX(180deg); filter: brightness(1) drop-shadow(0 0 0 rgba(255,255,255,0)); }
+  75%  { filter: brightness(1.9) drop-shadow(0 0 22px rgba(255,255,255,1)); }
+  100% { transform: rotateX(360deg); filter: brightness(1) drop-shadow(0 0 0 rgba(255,255,255,0)); }
+}
+@keyframes sparkleFlash {
+  0%, 100% { opacity: 0; }
+  25%, 75% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.flip-face {
+  position: absolute; inset: 0; backface-visibility: hidden;
+  border-radius: 32px; overflow: hidden;
+}
+.flip-front {
+  border: 4px solid rgba(255,255,255,0.7);
+  display: flex; align-items: center; justify-content: center;
+}
+.flip-front-logo {
+  font-size: 9vh; font-weight: 900; color: white; letter-spacing: -1px;
+  text-shadow: 0 4px 10px rgba(0,0,0,0.35);
+}
+.flip-back {
+  transform: rotateY(180deg);
+  background: #f2f2f2; display: flex; flex-direction: column;
+  border-radius: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+}
+.popup-card-slot { flex: 1 1 auto; position: relative; overflow: hidden; min-height: 0; border-radius: 32px 32px 0 0; }
+.popup-card-slot .card {
+  position: relative !important; inset: auto !important; display: block !important;
+  height: 100%; width: 100%;
+}
+.next-person-btn {
+  flex: 0 0 auto; font-size: 3.2vh; font-weight: 900; color: #111;
+  background: linear-gradient(135deg, #ff3cac 0%, #ff9a44 20%, #f7e733 40%, #3ee06b 58%, #22c1e0 75%, #7b5bff 90%, #ff3cac 100%);
+  text-shadow: 0 1px 3px rgba(255,255,255,0.55);
+  border: none; padding: 2vh 0; cursor: pointer; border-radius: 0 0 28px 28px;
+  transition: filter 0.2s ease;
+}
+.next-person-btn:hover { filter: brightness(1.08); }
+
+/* ===== Chance card content ===== */
+.chance-frame {
+  position: absolute; inset: 0;
+  padding: 2.6vh 3vw;
+  background: linear-gradient(135deg, #ff3cac 0%, #ff9a44 20%, #f7e733 40%, #3ee06b 58%, #22c1e0 75%, #7b5bff 90%, #ff3cac 100%);
+}
+.chance-inner {
+  background: white; border-radius: 22px; height: 100%; width: 100%;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 2.2vh 4.5vw; text-align: center; overflow-y: auto;
+}
+.chance-content {
+  margin-top: auto; margin-bottom: auto; width: 100%;
+  display: flex; flex-direction: column; align-items: center; gap: 2.2vh;
+}
+.chance-logo-small {
+  font-size: 18vh; font-weight: 900; letter-spacing: -1px; line-height: 1;
+}
+.chance-logo-small span:nth-child(1) { color: #1ba9f0; }
+.chance-logo-small span:nth-child(2) { color: #ffc107; }
+.chance-logo-small span:nth-child(3) { color: #ff2d78; }
+.chance-logo-small span:nth-child(4) { color: #7c1cf2; }
+.chance-logo-small span:nth-child(5) { color: #ff7a1a; }
+.chance-logo-small span:nth-child(6) { color: #5bd142; }
+.chance-text {
+  font-size: 5vh; font-weight: 800; line-height: 1.75; color: var(--ink); margin: 0;
+}
+.chance-extra {
+  font-size: 3vh; font-weight: 700; color: #555; line-height: 1.7; margin: 0;
+}
+.chance-move {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 4vh; font-weight: 900; color: white; padding: 1.6vh 3.4vw; border-radius: 999px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.25); line-height: 1.3; text-align: center;
+}
+.chance-move.forward { background: linear-gradient(135deg,#22c55e,#0ea56b); }
+.chance-move.backward { background: linear-gradient(135deg,#ef4444,#c0233f); }
+.chance-move.neutral { background: linear-gradient(135deg,#a855f7,#6d28d9); }
+
+.chance-reveal-btn {
+  display: inline-flex; align-items: center; gap: 1vw;
+  background: #111; color: white; font-weight: 800; font-size: 2.8vh;
+  padding: 1.3vh 3vw; border: none; border-radius: 999px; cursor: pointer;
+  transition: background 0.2s ease;
+}
+.chance-reveal-btn:hover { background: #333; }
+.chance-reveal-btn .chevron { display: inline-block; font-size: 2.2vh; transition: transform 0.3s ease; }
+.chance-reveal-btn[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+.chance-answer-panel {
+  max-height: 0; opacity: 0; overflow: hidden; width: 100%;
+  transition: max-height 0.4s ease, opacity 0.3s ease, margin-top 0.4s ease;
+  margin-top: 0;
+}
+.chance-answer-panel.show { max-height: 20vh; opacity: 1; margin-top: 0.4vh; }
+
+@media (max-width: 700px) {
+  .deck-logo { font-size: 5vh; }
+  .deck-sub { font-size: 2vh; }
+  .chance-logo-small { font-size: 12vh; }
+  .chance-text { font-size: 4.3vh; }
+  .chance-extra { font-size: 2.8vh; }
+  .chance-move { font-size: 3.6vh; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="chance-wordmark"><span>C</span><span>h</span><span>a</span><span>n</span><span>c</span><span>e</span></div>
+    <div class="instructions">
+      카드를 뽑아 뒤집으면 상황과 <b>이동 안내</b>가 나타납니다.<br/>
+      모두 함께 확인하고 안내에 따라 이동하세요!
+    </div>
+  </div>
+
+  <div class="stage" id="deckStage">
+    <div class="deck-wrap">
+      <div class="deck" id="deck">
+        <div class="deck-card deck-back rainbow-bg deck-back6"></div>
+        <div class="deck-card deck-back rainbow-bg deck-back5"></div>
+        <div class="deck-card deck-back rainbow-bg deck-back4"></div>
+        <div class="deck-card deck-back rainbow-bg deck-back3"></div>
+        <div class="deck-card deck-back rainbow-bg deck-back2"></div>
+        <div class="deck-card deck-back rainbow-bg deck-back1"></div>
+        <div class="deck-card deck-top rainbow-bg" id="deckTop">
+          <div class="deck-logo">Chance</div>
+          <div class="deck-sub">탭하여<br/>카드 뽑기</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="cardPool" class="card-pool">
+
+<section class="card active" data-idx="0">
+  <div class="chance-frame"><div class="chance-inner"><div class="chance-content">
+    <div class="chance-logo-small"><span>C</span><span>h</span><span>a</span><span>n</span><span>c</span><span>e</span></div>
+    <p class="chance-text">우리 지역 축제가 SNS에서 유명해져<br/>방문하는 관광객이 폭증했어요!</p>
+    <div class="chance-move forward">현재 위치로부터<br/>앞으로 2칸 이동</div>
+  </div></div></div>
+</section>
+
+<section class="card" data-idx="1">
+  <div class="chance-frame"><div class="chance-inner"><div class="chance-content">
+    <div class="chance-logo-small"><span>C</span><span>h</span><span>a</span><span>n</span><span>c</span><span>e</span></div>
+    <p class="chance-text">우리 지역의 특산품이 지리적 표시제 인증을 받았어요!</p>
+    <div class="chance-move forward">현재 위치로부터<br/>앞으로 3칸 이동</div>
+  </div></div></div>
+</section>
+
+<section class="card" data-idx="2">
+  <div class="chance-frame"><div class="chance-inner"><div class="chance-content">
+    <div class="chance-logo-small"><span>C</span><span>h</span><span>a</span><span>n</span><span>c</span><span>e</span></div>
+    <p class="chance-text">우리 지역의 캐릭터가 유명해져서<br/>굿즈가 불티나게 팔리고 있어요!</p>
+    <div class="chance-move forward">현재 위치로부터<br/>앞으로 2칸 이동</div>
+  </div></div></div>
+</section>
+
+<section class="card" data-idx="3">
+  <div class="chance-frame"><div class="chance-inner"><div class="chance-content">
+    <div class="chance-logo-small"><span>C</span><span>h</span><span>a</span><span>n</span><span>c</span><span>e</span></div>
+    <p class="chance-text">우리 지역에서 올림픽을 개최한 후로<br/>관광객의 방문이 계속돼요!</p>
+    <div class="chance-move forward">현재 위치로부터<br/>앞으로 2칸 이동</div>
+  </div></div></div>
+</section>
+
+<section class="card" data-idx="4">
+  <div class="chance-frame"><div class="chance-inner"><div class="chance-content">
+    <div class="chance-logo-small"><span>C</span><span>h</span><span>a</span><span>n</span><span>c</span><span>e</span></div>
+    <p class="chance-text">여행 간 지역에서 랜드마크를 구경하다가 길을 잃었는데,<br/>친절한 지역 주민을 만나 도움을 받았어요!</p>
+    <div class="chance-move forward">현재 위치로부터<br/>앞으로 1칸 이동</div>
+  </div></div></div>
+</section>
+
+<section class="card" data-idx="5">
+  <div class="chance-frame"><div class="chance-inner"><div class="chance-content">
+    <div class="chance-logo-small"><span>C</span><span>h</span><span>a</span><span>n</span><span>c</span><span>e</span></div>
+    <p class="chance-text">우리 지역의 인구가 감소하고 고령화가 되면서<br/>지역 경제가 침체된 분위기예요.</p>
+    <div class="chance-move backward">현재 위치로부터<br/>뒤로 2칸 이동</div>
+  </div></div></div>
+</section>
+
+<section class="card" data-idx="6">
+  <div class="chance-frame"><div class="chance-inner"><div class="chance-content">
+    <div class="chance-logo-small"><span>C</span><span>h</span><span>a</span><span>n</span><span>c</span><span>e</span></div>
+    <p class="chance-text">우리 지역 슬로건이 차별화되지 않아<br/>혹평을 듣고 있어요.</p>
+    <div class="chance-move backward">현재 위치로부터<br/>뒤로 2칸 이동</div>
+  </div></div></div>
+</section>
+
+<section class="card" data-idx="7">
+  <div class="chance-frame"><div class="chance-inner"><div class="chance-content">
+    <div class="chance-logo-small"><span>C</span><span>h</span><span>a</span><span>n</span><span>c</span><span>e</span></div>
+    <p class="chance-text">기후변화로 특산품 작황이 나빠져<br/>지리적 표시제가 취소됐어요.</p>
+    <div class="chance-move backward">현재 위치로부터<br/>뒤로 3칸 이동</div>
+  </div></div></div>
+</section>
+
+<section class="card" data-idx="8">
+  <div class="chance-frame"><div class="chance-inner"><div class="chance-content">
+    <div class="chance-logo-small"><span>C</span><span>h</span><span>a</span><span>n</span><span>c</span><span>e</span></div>
+    <p class="chance-text">우리 지역 축제 홍보가 미흡해<br/>관광객 방문이 저조해요.</p>
+    <div class="chance-move backward">현재 위치로부터<br/>뒤로 2칸 이동</div>
+  </div></div></div>
+</section>
+
+<section class="card" data-idx="9">
+  <div class="chance-frame"><div class="chance-inner"><div class="chance-content">
+    <div class="chance-logo-small"><span>C</span><span>h</span><span>a</span><span>n</span><span>c</span><span>e</span></div>
+    <p class="chance-text">몇 시간 차를 타고 지역 축제에 방문했는데,<br/>오늘은 마감했대요.</p>
+    <div class="chance-move backward">현재 위치로부터<br/>뒤로 1칸 이동</div>
+  </div></div></div>
+</section>
+
+<section class="card" data-idx="10">
+  <div class="chance-frame"><div class="chance-inner"><div class="chance-content">
+    <div class="chance-logo-small"><span>C</span><span>h</span><span>a</span><span>n</span><span>c</span><span>e</span></div>
+    <p class="chance-text">모두 함께 '가위바위보'를 하세요!</p>
+    <p class="chance-extra">나와 같은 것을 낸 사람이 있는 곳 중, 나에게 더 가까운 거리에 있는 곳으로 이동해요.<br/>(같은 것을 낸 사람이 없으면 이동하지 않습니다.)</p>
+    <div class="chance-move neutral">무승부 상대 쪽으로<br/>이동</div>
+  </div></div></div>
+</section>
+
+<section class="card" data-idx="11">
+  <div class="chance-frame"><div class="chance-inner"><div class="chance-content">
+    <div class="chance-logo-small"><span>C</span><span>h</span><span>a</span><span>n</span><span>c</span><span>e</span></div>
+    <p class="chance-text">유명한 지역 음식과 그 음식이 시작된 지역을<br/>함께 말하세요!</p>
+    <div class="chance-move forward">정답을 맞히면<br/>앞으로 1칸 이동</div>
+  </div></div></div>
+</section>
+
+<section class="card" data-idx="12">
+  <div class="chance-frame"><div class="chance-inner"><div class="chance-content">
+    <div class="chance-logo-small"><span>C</span><span>h</span><span>a</span><span>n</span><span>c</span><span>e</span></div>
+    <p class="chance-text">'사과'로 유명한 지역을 2곳 말하세요!</p>
+    <button class="chance-reveal-btn" type="button" aria-expanded="false">
+      <span class="reveal-label">정답 확인</span>
+      <span class="chevron">&#9660;</span>
+    </button>
+    <div class="chance-answer-panel">
+      <p class="chance-extra">예시 정답 : 무주, 청송, 충주, 밀양, 예산 등</p>
+    </div>
+    <div class="chance-move forward">정답을 맞히면<br/>앞으로 2칸 이동</div>
+  </div></div></div>
+</section>
+
+<section class="card" data-idx="13">
+  <div class="chance-frame"><div class="chance-inner"><div class="chance-content">
+    <div class="chance-logo-small"><span>C</span><span>h</span><span>a</span><span>n</span><span>c</span><span>e</span></div>
+    <p class="chance-text">'쌀'로 유명한 지역을 2곳 말하세요!</p>
+    <button class="chance-reveal-btn" type="button" aria-expanded="false">
+      <span class="reveal-label">정답 확인</span>
+      <span class="chevron">&#9660;</span>
+    </button>
+    <div class="chance-answer-panel">
+      <p class="chance-extra">예시 정답 : 철원, 이천, 안성, 여주, 김포 등</p>
+    </div>
+    <div class="chance-move forward">정답을 맞히면<br/>앞으로 2칸 이동</div>
+  </div></div></div>
+</section>
+
+<section class="card" data-idx="14">
+  <div class="chance-frame"><div class="chance-inner"><div class="chance-content">
+    <div class="chance-logo-small"><span>C</span><span>h</span><span>a</span><span>n</span><span>c</span><span>e</span></div>
+    <p class="chance-text">'한우'로 유명한 지역을 2곳 말하세요!</p>
+    <button class="chance-reveal-btn" type="button" aria-expanded="false">
+      <span class="reveal-label">정답 확인</span>
+      <span class="chevron">&#9660;</span>
+    </button>
+    <div class="chance-answer-panel">
+      <p class="chance-extra">예시 정답 : 횡성, 안성, 함평, 영광, 고흥, 홍천 등</p>
+    </div>
+    <div class="chance-move forward">정답을 맞히면<br/>앞으로 2칸 이동</div>
+  </div></div></div>
+</section>
+
+<section class="card" data-idx="15">
+  <div class="chance-frame"><div class="chance-inner"><div class="chance-content">
+    <div class="chance-logo-small"><span>C</span><span>h</span><span>a</span><span>n</span><span>c</span><span>e</span></div>
+    <p class="chance-text">'마늘'로 유명한 지역을 2곳 말하세요!</p>
+    <button class="chance-reveal-btn" type="button" aria-expanded="false">
+      <span class="reveal-label">정답 확인</span>
+      <span class="chevron">&#9660;</span>
+    </button>
+    <div class="chance-answer-panel">
+      <p class="chance-extra">예시 정답 : 의성, 단양, 남해, 고흥, 창녕, 삼척 등</p>
+    </div>
+    <div class="chance-move forward">정답을 맞히면<br/>앞으로 2칸 이동</div>
+  </div></div></div>
+</section>
+
+<section class="card" data-idx="16">
+  <div class="chance-frame"><div class="chance-inner"><div class="chance-content">
+    <div class="chance-logo-small"><span>C</span><span>h</span><span>a</span><span>n</span><span>c</span><span>e</span></div>
+    <p class="chance-text">우리 지역에서 영화제를 하는데<br/>대기업 몇 곳에서 투자 제안이 왔어요!</p>
+    <div class="chance-move forward">현재 위치로부터<br/>앞으로 3칸 이동</div>
+  </div></div></div>
+</section>
+
+<section class="card" data-idx="17">
+  <div class="chance-frame"><div class="chance-inner"><div class="chance-content">
+    <div class="chance-logo-small"><span>C</span><span>h</span><span>a</span><span>n</span><span>c</span><span>e</span></div>
+    <p class="chance-text">우리 지역의 영문명이 적힌 티셔츠를 입고<br/>걸어다니는 여행객을 만나서 기뻐요!</p>
+    <div class="chance-move forward">현재 위치로부터<br/>앞으로 1칸 이동</div>
+  </div></div></div>
+</section>
+
+  </div>
+<div id="usedPool" class="card-pool"></div>
+</div>
+
+<div class="popup-overlay" id="popupOverlay">
+  <div class="popup-flip" id="popupFlip">
+    <div class="flip-inner" id="flipInner">
+      <div class="flip-face flip-front rainbow-bg">
+        <div class="flip-front-logo">Chance</div>
+      </div>
+      <div class="flip-face flip-back">
+        <div class="popup-card-slot" id="popupCardSlot"></div>
+        <button class="next-person-btn" id="nextPersonBtn" type="button">다음 사람 뽑기 ▶</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const cardPool = document.getElementById('cardPool');
+  const deck = document.getElementById('deck');
+
+  const popupOverlay = document.getElementById('popupOverlay');
+  const popupFlip = document.getElementById('popupFlip');
+  const flipInner = document.getElementById('flipInner');
+  const popupCardSlot = document.getElementById('popupCardSlot');
+  const nextPersonBtn = document.getElementById('nextPersonBtn');
+
+  // ----- infinite shuffle-bag: exhaust all cards once (no repeats) per round,
+  // then reshuffle and keep going forever -----
+  const allCards = Array.from(cardPool.children);
+
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  let bag = shuffle(allCards);
+
+  function pickNextCard() {
+    if (bag.length === 0) bag = shuffle(allCards);
+    return bag.pop();
+  }
+
+  let currentCard = null;
+  let drawing = false;
+
+  function drawCard() {
+    if (drawing) return;
+    drawing = true;
+    deck.classList.add('drawing');
+
+    const pick = pickNextCard();
+
+    pick.classList.add('active');
+    resetAnswer(pick);
+    popupCardSlot.appendChild(pick);
+    currentCard = pick;
+
+    popupFlip.classList.add('mini');
+    flipInner.classList.remove('flipped', 'spin', 'spinX');
+    void popupFlip.offsetWidth;
+
+    popupOverlay.classList.add('show');
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        flipInner.classList.add('spin');
+      });
+    });
+
+    function onSpinEnd(e) {
+      if (e.target !== flipInner || e.animationName !== 'cardSpin360') return;
+      flipInner.removeEventListener('animationend', onSpinEnd);
+      flipInner.classList.remove('spin');
+
+      // phase 1b: small card spins a full 360 degrees vertically (top-to-bottom) in place
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          flipInner.classList.add('spinX');
+        });
+      });
+
+      function onSpinXEnd(e2) {
+        if (e2.target !== flipInner || e2.animationName !== 'cardSpin360X') return;
+        flipInner.removeEventListener('animationend', onSpinXEnd);
+        flipInner.classList.remove('spinX');
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            popupFlip.classList.remove('mini');
+            flipInner.classList.add('flipped');
+          });
+        });
+
+        function onPopEnd(e3) {
+          if (e3.target !== popupFlip) return;
+          if (e3.propertyName !== 'width' && e3.propertyName !== 'height') return;
+          popupFlip.removeEventListener('transitionend', onPopEnd);
+          drawing = false;
+          deck.classList.remove('drawing');
+        }
+        popupFlip.addEventListener('transitionend', onPopEnd);
+      }
+      flipInner.addEventListener('animationend', onSpinXEnd);
+    }
+    flipInner.addEventListener('animationend', onSpinEnd);
+  }
+
+  function resetAnswer(card) {
+    const btn = card.querySelector('.chance-reveal-btn');
+    const panel = card.querySelector('.chance-answer-panel');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+    if (panel) panel.classList.remove('show');
+  }
+
+  function closePopup() {
+    popupOverlay.classList.remove('show');
+    flipInner.classList.remove('flipped', 'spin', 'spinX');
+    popupFlip.classList.add('mini');
+    if (currentCard) {
+      currentCard.classList.remove('active');
+      resetAnswer(currentCard);
+      cardPool.appendChild(currentCard);
+      currentCard = null;
+    }
+  }
+
+  deck.addEventListener('click', drawCard);
+  nextPersonBtn.addEventListener('click', closePopup);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && popupOverlay.classList.contains('show')) closePopup();
+  });
+
+  // reveal-btn bindings (persist across DOM moves since we reuse the same nodes)
+  allCards.forEach(bindCardEvents);
+
+  function bindCardEvents(card) {
+    const btn = card.querySelector('.chance-reveal-btn');
+    const panel = card.querySelector('.chance-answer-panel');
+    if (btn && panel) {
+      btn.addEventListener('click', () => {
+        const isShown = panel.classList.toggle('show');
+        btn.setAttribute('aria-expanded', isShown ? 'true' : 'false');
+      });
+    }
+  }
+
+})();
+</script>
+</body>
+</html>
